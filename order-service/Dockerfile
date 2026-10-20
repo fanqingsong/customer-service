@@ -3,6 +3,10 @@ WORKDIR /src
 COPY pom.xml lombok.config ./
 COPY customer-service ./customer-service
 COPY order-service ./order-service
+COPY purchase-order-service ./purchase-order-service
+COPY inventory-service ./inventory-service
+COPY payment-service ./payment-service
+COPY workflow-orchestrator ./workflow-orchestrator
 RUN mvn -pl order-service package -Dmaven.test.skip=true
 
 FROM eclipse-temurin:17-jre

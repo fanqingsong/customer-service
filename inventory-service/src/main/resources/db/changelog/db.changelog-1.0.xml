@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+    <changeSet id="1" author="commerce">
+        <createTable tableName="products">
+            <column name="sku" type="VARCHAR(64)">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="name" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="stock" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="unit_price" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createTable tableName="reservations">
+            <column name="workflow_id" type="VARCHAR(64)">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="sku" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <changeSet id="2" author="commerce">
+        <insert tableName="products">
+            <column name="sku" value="CAR"/>
+            <column name="name" value="Car"/>
+            <column name="stock" valueNumeric="10"/>
+            <column name="unit_price" valueNumeric="5000"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>

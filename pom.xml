@@ -20,6 +20,10 @@
 	<modules>
 		<module>customer-service</module>
 		<module>order-service</module>
+		<module>purchase-order-service</module>
+		<module>inventory-service</module>
+		<module>payment-service</module>
+		<module>workflow-orchestrator</module>
 	</modules>
 
 	<properties>
@@ -59,6 +63,11 @@
 			<dependency>
 				<groupId>io.dapr</groupId>
 				<artifactId>dapr-sdk-springboot</artifactId>
+				<version>${dapr.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.dapr</groupId>
+				<artifactId>dapr-sdk-workflows</artifactId>
 				<version>${dapr.version}</version>
 			</dependency>
 			<dependency>

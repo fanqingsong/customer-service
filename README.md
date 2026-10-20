@@ -8,11 +8,17 @@
 
 - [发布订阅（Pub/Sub）](./docs/dapr-pubsub.md)
 - [服务调用（Service Invocation）](./docs/dapr-service-invocation.md)
+- [Workflow Saga：订单 / 库存 / 支付 + UI](./docs/dapr-workflow-saga-commerce.md)
 
 | 服务 | 端口 | 职责 |
 |------|------|------|
 | **customer-service** | 9100 | 客户 CRUD REST API，发布客户生命周期事件 |
 | **order-service** | 9200 | 订阅 `order-service` 主题；经 Dapr 调用 customer-service 查询客户 |
+| **purchase-order-service** | 9300 | 业务订单库（PENDING / CONFIRMED / CANCELLED） |
+| **inventory-service** | 9310 | 商品与库存预留 |
+| **payment-service** | 9320 | 支付 / 退款 |
+| **workflow-orchestrator** | 9400 | Dapr Workflow Saga 编排 + `/api/checkout` |
+| **shop-ui** | 9500 | React 下单界面 |
 
 ### 目录结构
 
@@ -23,6 +29,11 @@
 │   ├── src/main/resources/
 │   └── Dockerfile
 ├── order-service/
+├── purchase-order-service/
+├── inventory-service/
+├── payment-service/
+├── workflow-orchestrator/
+├── shop-ui/
 ├── dapr-components/
 ├── docker-compose.yml
 └── pom.xml
@@ -50,6 +61,8 @@ docker compose up --build
 
 * Customer API / Swagger: http://localhost:9100/swagger-ui.html
 * Order Service 健康检查: http://localhost:9200/actuator/health
+* **Commerce Shop UI**: http://localhost:9500
+* Orchestrator API: http://localhost:9400/api/products
 
 停止：
 

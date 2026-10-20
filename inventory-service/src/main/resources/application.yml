@@ -1,0 +1,21 @@
+server:
+  port: ${PORT:9310}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/inventory_db}
+    username: ${DB_USER:commerce}
+    password: ${DB_PASSWORD:commerce}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
