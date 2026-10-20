@@ -1,0 +1,4 @@
+# 服务调用（Service Invocation）子 demo — 与发布订阅共用 customer-service / order-service
+# 单独启动：docker compose -f demos/服务调用/docker-compose.yml up --build
+include:
+  - path: ../发布订阅/docker-compose.yml

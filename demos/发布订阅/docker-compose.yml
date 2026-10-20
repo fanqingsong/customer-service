@@ -1,0 +1,141 @@
+# 发布订阅（Pub/Sub）子 demo — 单独启动：docker compose -f demos/发布订阅/docker-compose.yml up --build
+services:
+  placement:
+    image: daprio/placement:1.17.2
+    container_name: dapr-placement
+    command: ["./placement", "-port", "50005"]
+    ports:
+      - "50005:50005"
+    networks:
+      - customer-order
+
+  scheduler:
+    image: daprio/scheduler:1.17.2
+    container_name: dapr-scheduler
+    restart: unless-stopped
+    user: root
+    command: ["./scheduler", "--port", "50006", "--etcd-data-dir", "/data"]
+    ports:
+      - "50008:50006"
+    volumes:
+      - dapr-scheduler-data:/data
+    networks:
+      - customer-order
+
+  redis:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/redis:7-alpine
+    container_name: dapr-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - customer-order
+
+  zipkin:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/openzipkin/zipkin:3.4
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - customer-order
+
+  customer-service:
+    image: customer-service:local
+    build:
+      context: ../..
+      dockerfile: demos/发布订阅/customer-service/Dockerfile
+    container_name: customer-service
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+      - "50001:50001"
+    depends_on:
+      - redis
+      - placement
+    networks:
+      - customer-order
+
+  customer-service-dapr:
+    image: daprio/daprd:1.17.2
+    container_name: dapr-sidecar-customer-service
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - customer-service
+      - -app-port
+      - "9100"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -scheduler-host-address
+      - scheduler:50006
+      - -dapr-listen-addresses
+      - 0.0.0.0
+    volumes:
+      - ./dapr-components:/dapr-components
+    depends_on:
+      - customer-service
+      - redis
+      - placement
+      - scheduler
+    network_mode: service:customer-service
+
+  order-service:
+    image: order-service:local
+    build:
+      context: ../..
+      dockerfile: demos/发布订阅/order-service/Dockerfile
+    container_name: order-service
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+      - "50002:50001"
+    depends_on:
+      - redis
+      - placement
+      - customer-service
+    networks:
+      - customer-order
+
+  order-service-dapr:
+    image: daprio/daprd:1.17.2
+    container_name: dapr-sidecar-order-service
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - order-service
+      - -app-port
+      - "9200"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -scheduler-host-address
+      - scheduler:50006
+      - -dapr-listen-addresses
+      - 0.0.0.0
+    volumes:
+      - ./dapr-components:/dapr-components
+    depends_on:
+      - order-service
+      - redis
+      - placement
+      - scheduler
+    network_mode: service:order-service
+
+networks:
+  customer-order:
+    driver: bridge
+
+volumes:
+  dapr-scheduler-data:

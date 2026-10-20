@@ -1,0 +1,13 @@
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /src
+COPY pom.xml lombok.config ./
+COPY demos/workflow ./demos/workflow
+RUN mvn install -N -Dmaven.test.skip=true \
+    && mvn -pl demos/workflow/inventory-service -am package -Dmaven.test.skip=true
+
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /src/demos/workflow/inventory-service/target/inventory-service-exec.jar /app/app.jar
+EXPOSE 9310
+ENV PORT=9310
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -18,12 +18,12 @@
 	<packaging>pom</packaging>
 
 	<modules>
-		<module>customer-service</module>
-		<module>order-service</module>
-		<module>purchase-order-service</module>
-		<module>inventory-service</module>
-		<module>payment-service</module>
-		<module>workflow-orchestrator</module>
+		<module>demos/发布订阅/customer-service</module>
+		<module>demos/发布订阅/order-service</module>
+		<module>demos/workflow/purchase-order-service</module>
+		<module>demos/workflow/inventory-service</module>
+		<module>demos/workflow/payment-service</module>
+		<module>demos/workflow/workflow-orchestrator</module>
 	</modules>
 
 	<properties>

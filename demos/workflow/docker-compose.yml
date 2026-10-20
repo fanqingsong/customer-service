@@ -1,0 +1,290 @@
+# Workflow（Saga 电商）子 demo — 单独启动：docker compose -f demos/workflow/docker-compose.yml up --build
+services:
+  placement:
+    image: daprio/placement:1.17.2
+    container_name: dapr-placement
+    command: ["./placement", "-port", "50005"]
+    ports:
+      - "50005:50005"
+    networks:
+      - customer-order
+
+  scheduler:
+    image: daprio/scheduler:1.17.2
+    container_name: dapr-scheduler
+    restart: unless-stopped
+    user: root
+    command: ["./scheduler", "--port", "50006", "--etcd-data-dir", "/data"]
+    ports:
+      - "50008:50006"
+    volumes:
+      - dapr-scheduler-data:/data
+    networks:
+      - customer-order
+
+  redis:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/redis:7-alpine
+    container_name: dapr-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - customer-order
+
+  zipkin:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/openzipkin/zipkin:3.4
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - customer-order
+
+  postgres:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/postgres:16-alpine
+    container_name: commerce-postgres
+    environment:
+      POSTGRES_USER: commerce
+      POSTGRES_PASSWORD: commerce
+      POSTGRES_DB: commerce
+    volumes:
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commerce -d commerce"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - customer-order
+
+  purchase-order-service:
+    image: purchase-order-service:local
+    build:
+      context: ../..
+      dockerfile: demos/workflow/purchase-order-service/Dockerfile
+    container_name: purchase-order-service
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/purchase_order_db
+      DB_USER: commerce
+      DB_PASSWORD: commerce
+    ports:
+      - "9300:9300"
+      - "50003:50001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      placement:
+        condition: service_started
+    networks:
+      - customer-order
+
+  purchase-order-service-dapr:
+    image: daprio/daprd:1.17.2
+    container_name: dapr-sidecar-purchase-order-service
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - purchase-order-service
+      - -app-port
+      - "9300"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -scheduler-host-address
+      - scheduler:50006
+      - -dapr-listen-addresses
+      - 0.0.0.0
+    volumes:
+      - ./dapr-components:/dapr-components
+    depends_on:
+      - purchase-order-service
+      - scheduler
+    network_mode: service:purchase-order-service
+
+  inventory-service:
+    image: inventory-service:local
+    build:
+      context: ../..
+      dockerfile: demos/workflow/inventory-service/Dockerfile
+    container_name: inventory-service
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/inventory_db
+      DB_USER: commerce
+      DB_PASSWORD: commerce
+    ports:
+      - "9310:9310"
+      - "50004:50001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      placement:
+        condition: service_started
+    networks:
+      - customer-order
+
+  inventory-service-dapr:
+    image: daprio/daprd:1.17.2
+    container_name: dapr-sidecar-inventory-service
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - inventory-service
+      - -app-port
+      - "9310"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -scheduler-host-address
+      - scheduler:50006
+      - -dapr-listen-addresses
+      - 0.0.0.0
+    volumes:
+      - ./dapr-components:/dapr-components
+    depends_on:
+      - inventory-service
+      - scheduler
+    network_mode: service:inventory-service
+
+  payment-service:
+    image: payment-service:local
+    build:
+      context: ../..
+      dockerfile: demos/workflow/payment-service/Dockerfile
+    container_name: payment-service
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/payment_db
+      DB_USER: commerce
+      DB_PASSWORD: commerce
+    ports:
+      - "9320:9320"
+      - "50007:50001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      placement:
+        condition: service_started
+    networks:
+      - customer-order
+
+  payment-service-dapr:
+    image: daprio/daprd:1.17.2
+    container_name: dapr-sidecar-payment-service
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - payment-service
+      - -app-port
+      - "9320"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -scheduler-host-address
+      - scheduler:50006
+      - -dapr-listen-addresses
+      - 0.0.0.0
+    volumes:
+      - ./dapr-components:/dapr-components
+    depends_on:
+      - payment-service
+      - scheduler
+    network_mode: service:payment-service
+
+  workflow-orchestrator:
+    image: workflow-orchestrator:local
+    build:
+      context: ../..
+      dockerfile: demos/workflow/workflow-orchestrator/Dockerfile
+    container_name: workflow-orchestrator
+    restart: unless-stopped
+    environment:
+      DAPR_HTTP_HOST: 127.0.0.1
+      DAPR_HTTP_PORT: 3500
+    ports:
+      - "9400:9400"
+      - "50006:50001"
+    depends_on:
+      - purchase-order-service
+      - inventory-service
+      - payment-service
+      - redis
+      - placement
+      - scheduler
+    networks:
+      - customer-order
+
+  workflow-orchestrator-dapr:
+    image: daprio/daprd:1.17.2
+    container_name: dapr-sidecar-workflow-orchestrator
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - workflow-orchestrator
+      - -app-port
+      - "9400"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -scheduler-host-address
+      - scheduler:50006
+      - -dapr-listen-addresses
+      - 0.0.0.0
+    volumes:
+      - ./dapr-components:/dapr-components
+    depends_on:
+      - workflow-orchestrator
+      - scheduler
+    network_mode: service:workflow-orchestrator
+
+  shop-ui:
+    image: shop-ui:local
+    build:
+      context: ./shop-ui
+      dockerfile: Dockerfile
+    container_name: shop-ui
+    restart: unless-stopped
+    ports:
+      - "9500:80"
+    depends_on:
+      - workflow-orchestrator
+    networks:
+      - customer-order
+
+networks:
+  customer-order:
+    driver: bridge
+
+volumes:
+  dapr-scheduler-data:
