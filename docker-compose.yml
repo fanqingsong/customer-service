@@ -1,52 +1,110 @@
-version: '3.3'
 services:
-  # customer-service and its Dapr sidecar
-  # zipkin
-
-  ############################
-  # customer-service and its Dapr sidecar
-  ############################
-  customer-service:
-    image: customer-service
-    build:
-      context: rest-controller
-      dockerfile: Dockerfile
-    container_name: customer-service
+  placement:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/daprio/placement:1.14.4
+    container_name: dapr-placement
+    command: ["./placement", "-port", "50005"]
     ports:
-      - 9100:9100
+      - "50005:50005"
     networks:
-      - customer-service
+      - customer-order
+
+  redis:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/redis:7-alpine
+    container_name: dapr-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - customer-order
+
+  customer-service:
+    image: customer-service:local
+    build:
+      context: .
+      dockerfile: customer-service/Dockerfile
+    container_name: customer-service
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+      - "50001:50001"
+    depends_on:
+      - redis
+      - placement
+    networks:
+      - customer-order
 
   customer-service-dapr:
-    image: daprio/daprd:edge
-    container_name: Dapr.Sidecar-customer-service
-    command: ["./daprd",
-              "-app-id", "customer-service",
-              "-app-port", "9100",
-              "-config", "/dapr-components/config.yaml",
-              "-log-level", "debug",
-              "-components-path", "/dapr-components"]
+    image: daprio/daprd:1.14.4
+    container_name: dapr-sidecar-customer-service
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - customer-service
+      - -app-port
+      - "9100"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -dapr-listen-addresses
+      - 0.0.0.0
     volumes:
-      - "./dapr-components:/dapr-components"
+      - ./dapr-components:/dapr-components
     depends_on:
       - customer-service
-    network_mode: "service:customer-service"
+      - redis
+      - placement
+    network_mode: service:customer-service
 
-  zipkin:
-    image: openzipkin/zipkin-slim
+  order-service:
+    image: order-service:local
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    container_name: order-service
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+      - "50002:50001"
+    depends_on:
+      - redis
+      - placement
+      - customer-service
+    networks:
+      - customer-order
 
-  ############################
-  # Redis (commented out as we are using a public mqtt broker for testing, no need for local instance of redis or mosquitto)
-  ############################
-#  redis:
-#    image: redis:alpine
-#    container_name: Dapr.redis
-#    ports:
-#      - "6379"
-#    networks:
-#      - customer-service
+  order-service-dapr:
+    image: daprio/daprd:1.14.4
+    container_name: dapr-sidecar-order-service
+    restart: unless-stopped
+    command:
+      - ./daprd
+      - -app-id
+      - order-service
+      - -app-port
+      - "9200"
+      - -config
+      - /dapr-components/config.yaml
+      - -log-level
+      - info
+      - -components-path
+      - /dapr-components
+      - -placement-host-address
+      - placement:50005
+      - -dapr-listen-addresses
+      - 0.0.0.0
+    volumes:
+      - ./dapr-components:/dapr-components
+    depends_on:
+      - order-service
+      - redis
+      - placement
+    network_mode: service:order-service
 
 networks:
-  customer-service:
-    external:
-      name: local_customer_service
+  customer-order:
+    driver: bridge
